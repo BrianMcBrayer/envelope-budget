@@ -81,9 +81,9 @@ def password_hash(
     password_text = password_value or prompt_password(confirm=True)
     hashed = generate_password_hash(password_text, method=method, salt_length=salt_length)
     if print_export:
-        console.print(f"export APP_PASSWORD='{hashed}'")
+        click.echo(f"export APP_PASSWORD='{hashed}'")
     else:
-        console.print(hashed)
+        click.echo(hashed)
 
 
 @password.command("set")
