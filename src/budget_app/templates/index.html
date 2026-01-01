@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+<header class="app-header">
+  <h1>Envelope Budget</h1>
+  <p>Keep spending intentional and month-to-month momentum visible.</p>
+  <div class="actions">
+    <form action="{{ url_for('logout') }}" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <button type="submit" class="secondary">Log out</button>
+    </form>
+  </div>
+</header>
+
+<section class="grid">
+  {% if envelopes %}
+    {% for env in envelopes %}
+      {% include "partials/envelope_card.html" %}
+    {% endfor %}
+  {% else %}
+    <article class="card empty-state">
+      <h2>No envelopes yet</h2>
+      <p>Add your first envelope to start tracking spending.</p>
+    </article>
+  {% endif %}
+</section>
+
+<details class="card manage-panel">
+  <summary>Manage Envelopes</summary>
+  <form action="{{ url_for('add_envelope') }}" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <label>
+      Name
+      <input name="name" placeholder="Groceries" required />
+    </label>
+    <label>
+      Base amount
+      <input name="base_amount" type="number" step="0.01" min="0" required />
+    </label>
+    <label>
+      Type
+      <select name="mode" required>
+        <option value="reset">Reset</option>
+        <option value="rollover">Rollover</option>
+      </select>
+    </label>
+    <button type="submit">Create envelope</button>
+  </form>
+</details>
+{% endblock %}

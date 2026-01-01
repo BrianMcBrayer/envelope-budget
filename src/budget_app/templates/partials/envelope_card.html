@@ -1,0 +1,102 @@
+<article class="envelope-card" id="env-{{ env.id }}" x-data="{ showDeposit: false }">
+  <header class="card-header">
+    <strong>{{ env.name }}</strong>
+    <form action="{{ url_for('archive_envelope', envelope_id=env.id) }}" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <button type="submit" class="secondary outline" aria-label="Archive {{ env.name }}">
+        Archive
+      </button>
+    </form>
+  </header>
+
+  <div class="balance-display">
+    <h2
+      id="balance-val-{{ env.id }}"
+      class="{% if env.balance < 0 %}negative{% endif %}"
+    >
+      {{ env.balance|currency }}
+    </h2>
+    <progress
+      id="progress-{{ env.id }}"
+      class="{% if env.balance > env.base_amount %}surplus{% endif %}"
+      value="{% if env.balance > 0 %}{{ env.balance }}{% else %}0{% endif %}"
+      max="{% if env.balance > env.base_amount %}{{ env.balance }}{% else %}{{ env.base_amount }}{% endif %}"
+    ></progress>
+  </div>
+
+  <div class="actions">
+    <button
+      type="button"
+      class="secondary outline"
+      @click="showDeposit = false"
+      :aria-pressed="showDeposit === false"
+    >
+      Spend
+    </button>
+    <button
+      type="button"
+      class="secondary outline"
+      @click="showDeposit = true"
+      :aria-pressed="showDeposit === true"
+    >
+      Deposit
+    </button>
+  </div>
+
+  <form
+    hx-post="{{ url_for('spend', envelope_id=env.id) }}"
+    hx-target="#env-{{ env.id }}"
+    hx-swap="outerHTML"
+    hx-indicator="#spend-indicator-{{ env.id }}"
+    action="{{ url_for('spend', envelope_id=env.id) }}"
+    method="post"
+    class="spend-form"
+    x-show="showDeposit === false"
+    x-cloak
+  >
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <fieldset role="group">
+      <input
+        type="number"
+        name="amount"
+        step="0.01"
+        min="0"
+        placeholder="Amount spent..."
+        required
+      />
+      <button type="submit">Spend</button>
+    </fieldset>
+    <small
+      id="spend-indicator-{{ env.id }}"
+      class="htmx-indicator loading-indicator"
+      role="status"
+      aria-live="polite"
+    >
+      Processing...
+    </small>
+  </form>
+
+  <form
+    hx-post="{{ url_for('add_funds', envelope_id=env.id) }}"
+    hx-target="#env-{{ env.id }}"
+    hx-swap="outerHTML"
+    action="{{ url_for('add_funds', envelope_id=env.id) }}"
+    method="post"
+    class="deposit-form"
+    x-show="showDeposit === true"
+    x-cloak
+  >
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <fieldset role="group">
+      <input
+        type="number"
+        name="amount"
+        step="0.01"
+        min="0"
+        placeholder="Amount deposited..."
+        required
+      />
+      <button type="submit">Deposit</button>
+    </fieldset>
+  </form>
+</article>

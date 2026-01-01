@@ -1,0 +1,42 @@
+[project]
+name = "budget-app"
+version = "0.1.0"
+description = "Self-hosted envelope budget app"
+requires-python = ">=3.12"
+dependencies = [
+  "click>=8.1.7",
+  "flask>=3.0.0",
+  "flask-migrate>=4.1.0",
+  "flask-sqlalchemy>=3.1.1",
+  "flask-wtf>=1.2.2",
+  "gunicorn>=21.2.0",
+  "pydantic-settings>=2.2.1",
+  "rich>=13.7.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[project.scripts]
+budget-cli = "budget_app.cli:cli"
+
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["setuptools>=70.0.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["budget_app"]
+
+[tool.setuptools.package-data]
+budget_app = ["templates/**/*.html", "static/**/*"]

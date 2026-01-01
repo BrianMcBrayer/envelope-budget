@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card" style="margin-top: 4rem; max-width: 480px;">
+  <h1>Welcome back</h1>
+  <p>Enter the app password to continue.</p>
+  {% if error %}
+    <small style="color: #b42318;">{{ error }}</small>
+  {% endif %}
+  <form action="{{ url_for('login_post') }}" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <label>
+      Password
+      <input type="password" name="password" required />
+    </label>
+    <button type="submit">Sign in</button>
+  </form>
+</section>
+{% endblock %}
