@@ -1,0 +1,4 @@
+SHELL=/bin/sh
+PATH=/app/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+0 * * * * budget-cli sync-funds >> /proc/1/fd/1 2>&1
