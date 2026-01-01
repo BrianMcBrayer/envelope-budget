@@ -48,8 +48,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push (commit)
         run: |
+          repo="${GITHUB_REPOSITORY,,}"
           docker buildx build --push \
-            -t ghcr.io/${{ github.repository }}:sha-${{ steps.commit.outputs.value }} \
+            -t ghcr.io/${repo}:sha-${{ steps.commit.outputs.value }} \
             .
 
   build-and-push-release:
@@ -69,6 +70,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push (release)
         run: |
+          repo="${GITHUB_REPOSITORY,,}"
           docker buildx build --push \
-            -t ghcr.io/${{ github.repository }}:${{ github.event.release.tag_name }} \
+            -t ghcr.io/${repo}:${{ github.event.release.tag_name }} \
             .
