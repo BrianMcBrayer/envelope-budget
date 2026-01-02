@@ -73,4 +73,5 @@ jobs:
           repo="${GITHUB_REPOSITORY,,}"
           docker buildx build --push \
             -t ghcr.io/${repo}:${{ github.event.release.tag_name }} \
+            -t ghcr.io/${repo}:latest \
             .
