@@ -297,6 +297,43 @@ def test_progress_bar_handles_rollover_surplus(client):
     assert b'max="75.00"' in response.data
 
 
+def test_progress_bar_flags_low_balance(client):
+    login(client)
+    with client.application.app_context():
+        envelope = Envelope(
+            name="Groceries",
+            base_amount=Decimal("100.00"),
+            balance=Decimal("5.00"),
+            mode="reset",
+        )
+        db.session.add(envelope)
+        db.session.commit()
+        envelope_id = envelope.id
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert f'id="progress-{envelope_id}"'.encode() in response.data
+    assert b"low-balance" in response.data
+
+
+def test_ui_contains_modern_slate_vars(client):
+    response = client.get("/login")
+    assert response.status_code == 200
+    assert b"--pico-background-color: #0f172a" in response.data
+    assert b"backdrop-filter" in response.data
+
+
+def test_ui_has_refined_elements(client):
+    login(client)
+    response = client.get("/")
+    assert response.status_code == 200
+    assert b"btn-archive" in response.data
+    assert b"backdrop-filter: blur" in response.data
+    assert b'header class="app-header"' in response.data
+    assert b'div class="container"' in response.data
+
+
 def test_envelope_card_has_deposit_toggle(client):
     login(client)
     with client.application.app_context():
@@ -316,6 +353,26 @@ def test_envelope_card_has_deposit_toggle(client):
     assert b"x-data" in response.data
     assert b">Deposit<" in response.data
     assert f'hx-post="/envelopes/{envelope_id}/add"'.encode() in response.data
+
+
+def test_envelope_card_forms_have_transitions(client):
+    login(client)
+    with client.application.app_context():
+        envelope = Envelope(
+            name="Savings",
+            base_amount=Decimal("75.00"),
+            balance=Decimal("75.00"),
+            mode="reset",
+        )
+        db.session.add(envelope)
+        db.session.commit()
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert b'x-transition:enter="transition-smooth"' in response.data
+    assert b'x-transition:enter-start="opacity-0 transform -translate-y-2"' in response.data
+    assert b'x-transition:enter-end="opacity-100 transform translate-y-0"' in response.data
 
 
 def test_spend_form_has_loading_indicator(client):

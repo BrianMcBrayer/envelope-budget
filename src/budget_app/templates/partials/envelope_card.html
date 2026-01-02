@@ -1,15 +1,17 @@
 <article class="envelope-card" id="env-{{ env.id }}" x-data="{ showDeposit: false }">
-  <header class="card-header">
-    <strong>{{ env.name }}</strong>
-    <form action="{{ url_for('archive_envelope', envelope_id=env.id) }}" method="post">
+  <header class="card-header" style="border-bottom: none; padding: 0; margin-bottom: 0.5rem;">
+    <strong style="font-size: 1.1rem; letter-spacing: -0.01em;">{{ env.name }}</strong>
+    <form action="{{ url_for('archive_envelope', envelope_id=env.id) }}" method="post" style="margin: 0;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-      <button type="submit" class="secondary outline" aria-label="Archive {{ env.name }}">
-        Archive
+      <button type="submit" class="btn-archive" aria-label="Archive">
+        <small>Archive</small>
       </button>
     </form>
   </header>
 
   <div class="balance-display">
+    {% set is_surplus = env.balance > env.base_amount %}
+    {% set is_low_balance = env.base_amount and env.balance < (env.base_amount / 10) %}
     <h2
       id="balance-val-{{ env.id }}"
       class="{% if env.balance < 0 %}negative{% endif %}"
@@ -18,25 +20,28 @@
     </h2>
     <progress
       id="progress-{{ env.id }}"
-      class="{% if env.balance > env.base_amount %}surplus{% endif %}"
-      value="{% if env.balance > 0 %}{{ env.balance }}{% else %}0{% endif %}"
-      max="{% if env.balance > env.base_amount %}{{ env.balance }}{% else %}{{ env.base_amount }}{% endif %}"
+      class="{% if is_surplus %}surplus{% endif %}{% if is_low_balance %}{% if is_surplus %} {% endif %}low-balance{% endif %}"
+      value="{{ env.balance if env.balance > 0 else 0 }}"
+      max="{{ env.balance if is_surplus else env.base_amount }}"
+      style="--pico-progress-color: var(--pico-primary);"
     ></progress>
   </div>
 
-  <div class="actions">
+  <div class="actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
     <button
       type="button"
-      class="secondary outline"
+      class="outline"
       @click="showDeposit = false"
+      :class="!showDeposit && 'primary'"
       :aria-pressed="showDeposit === false"
     >
       Spend
     </button>
     <button
       type="button"
-      class="secondary outline"
+      class="outline"
       @click="showDeposit = true"
+      :class="showDeposit && 'primary'"
       :aria-pressed="showDeposit === true"
     >
       Deposit
@@ -52,6 +57,9 @@
     method="post"
     class="spend-form"
     x-show="showDeposit === false"
+    x-transition:enter="transition-smooth"
+    x-transition:enter-start="opacity-0 transform -translate-y-2"
+    x-transition:enter-end="opacity-100 transform translate-y-0"
     x-cloak
   >
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
@@ -84,6 +92,9 @@
     method="post"
     class="deposit-form"
     x-show="showDeposit === true"
+    x-transition:enter="transition-smooth"
+    x-transition:enter-start="opacity-0 transform -translate-y-2"
+    x-transition:enter-end="opacity-100 transform translate-y-0"
     x-cloak
   >
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
