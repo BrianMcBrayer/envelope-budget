@@ -15,9 +15,9 @@ from flask import (
     has_app_context,
 )
 from flask_wtf import CSRFProtect
-from flask_migrate import Migrate
+from flask_migrate import Migrate, stamp, upgrade
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Numeric, TypeDecorator
+from sqlalchemy import Numeric, TypeDecorator, inspect
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from werkzeug.security import check_password_hash
 from pydantic import ValidationError
@@ -27,6 +27,7 @@ db = SQLAlchemy()
 migrate = Migrate()
 csrf = CSRFProtect()
 TWOPLACES = Decimal("0.01")
+BASE_REVISION = "0a9d4dd555ac"
 
 
 class RoundedNumeric(TypeDecorator):
@@ -144,10 +145,13 @@ def create_app(config: dict | None = None) -> Flask:
     )
     if config:
         app.config.update(config)
+    app.config.setdefault("AUTO_MIGRATE", True)
 
     db.init_app(app)
     migrate.init_app(app, db)
     csrf.init_app(app)
+    if app.config["AUTO_MIGRATE"]:
+        ensure_schema_migrated(app)
 
     @app.template_filter("currency")
     def currency_filter(value: Decimal) -> str:
@@ -277,6 +281,25 @@ def parse_amount(raw: str) -> Decimal:
 
 def format_currency(value: Decimal) -> str:
     return f"${value:.2f}"
+
+
+def ensure_schema_migrated(app: Flask) -> None:
+    with app.app_context():
+        connection = db.session.connection()
+        inspector = inspect(connection)
+        tables = set(inspector.get_table_names())
+        if "alembic_version" not in tables:
+            if "envelope" in tables:
+                stamp(revision=BASE_REVISION)
+            else:
+                upgrade()
+                return
+        if "envelope" not in tables:
+            upgrade()
+            return
+        columns = {column["name"] for column in inspector.get_columns("envelope")}
+        if "archived_at" not in columns or "transaction" not in tables:
+            upgrade()
 
 
 def render_envelope_or_redirect(envelope: Envelope):

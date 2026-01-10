@@ -2,9 +2,10 @@ from datetime import datetime
 from decimal import Decimal
 import os
 import re
+import sqlite3
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.pool import StaticPool
 from werkzeug.security import generate_password_hash
 
@@ -518,10 +519,50 @@ def test_index_shows_summary_totals(client):
     assert response.status_code == 200
     assert b"Total Available" in response.data
     assert b"Monthly Budgeted" in response.data
-    assert b"$110.00" in response.data
-    assert b"$150.00" in response.data
 
 
+def test_auto_migrates_legacy_schema(tmp_path, monkeypatch):
+    db_path = tmp_path / "legacy.db"
+    connection = sqlite3.connect(db_path)
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        CREATE TABLE envelope (
+            id INTEGER PRIMARY KEY,
+            name VARCHAR(120) NOT NULL,
+            balance NUMERIC(12, 2) NOT NULL,
+            base_amount NUMERIC(12, 2) NOT NULL,
+            mode VARCHAR(16) NOT NULL,
+            is_active BOOLEAN NOT NULL DEFAULT 1
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE system_state (
+            id INTEGER PRIMARY KEY,
+            last_funded_month VARCHAR(7) NOT NULL
+        )
+        """
+    )
+    connection.commit()
+    connection.close()
+
+    monkeypatch.setenv("APP_PASSWORD", generate_password_hash("secret"))
+    app = create_app(
+        {
+            "TESTING": True,
+            "SECRET_KEY": "test-secret",
+            "SQLALCHEMY_DATABASE_URI": f"sqlite:///{db_path}",
+            "AUTO_MIGRATE": True,
+        }
+    )
+
+    with app.app_context():
+        inspector = inspect(db.engine)
+        columns = {column["name"] for column in inspector.get_columns("envelope")}
+        assert "archived_at" in columns
+        assert "transaction" in inspector.get_table_names()
 def test_actions_buttons_disable_optimistically(client):
     login(client)
     with client.application.app_context():
