@@ -1,4 +1,8 @@
-<article class="envelope-card" id="env-{{ env.id }}" x-data="{ showDeposit: false }">
+<article
+  class="envelope-card"
+  id="env-{{ env.id }}"
+  x-data="{ showDeposit: false, spending: false, depositing: false }"
+>
   <header class="card-header" style="border-bottom: none; padding: 0; margin-bottom: 0.5rem;">
     <strong style="font-size: 1.1rem; letter-spacing: -0.01em;">{{ env.name }}</strong>
     <form action="{{ url_for('archive_envelope', envelope_id=env.id) }}" method="post" style="margin: 0;">
@@ -26,6 +30,16 @@
       style="--pico-progress-color: var(--pico-primary);"
     ></progress>
   </div>
+
+  {% if error %}
+    <p
+      class="error-message"
+      role="alert"
+      style="margin: 0.5rem 0 0; color: var(--pico-del-color); font-weight: 600;"
+    >
+      {{ error }}
+    </p>
+  {% endif %}
 
   <div class="actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
     <button
@@ -72,8 +86,21 @@
         placeholder="Amount spent..."
         required
       />
-      <button type="submit">Spend</button>
+      <button
+        type="submit"
+        id="spend-button-{{ env.id }}"
+        x-bind:disabled="spending"
+        @click="spending = true"
+      >
+        Spend
+      </button>
     </fieldset>
+    <input
+      type="text"
+      name="note"
+      placeholder="Note (optional)..."
+      maxlength="255"
+    />
     <small
       id="spend-indicator-{{ env.id }}"
       class="htmx-indicator loading-indicator"
@@ -107,7 +134,12 @@
         placeholder="Amount deposited..."
         required
       />
-      <button type="submit">Deposit</button>
+      <button
+        type="submit"
+        id="deposit-button-{{ env.id }}"
+        x-bind:disabled="depositing"
+        @click="depositing = true"
+      >Deposit</button>
     </fieldset>
   </form>
 </article>

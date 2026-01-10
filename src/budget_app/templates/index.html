@@ -15,6 +15,18 @@
 </header>
 
 <section class="grid">
+  <article class="card summary-card" style="grid-column: 1 / -1;">
+    <div style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between;">
+      <div>
+        <small style="opacity: 0.7; text-transform: uppercase; letter-spacing: 0.08em;">Total Available</small>
+        <h2 style="margin: 0.25rem 0 0 0;">{{ total_available|currency }}</h2>
+      </div>
+      <div style="text-align: right;">
+        <small style="opacity: 0.7; text-transform: uppercase; letter-spacing: 0.08em;">Monthly Budgeted</small>
+        <h2 style="margin: 0.25rem 0 0 0;">{{ monthly_budgeted|currency }}</h2>
+      </div>
+    </div>
+  </article>
   {% if envelopes %}
     {% for env in envelopes %}
       {% include "partials/envelope_card.html" %}

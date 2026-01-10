@@ -26,3 +26,12 @@ Use test-driven development for all functional changes:
 - After dependency changes, run `uv lock`.
 - Use `uv run` for running tools (e.g., `uv run --extra dev pytest`).
 - Avoid `pip` or ad-hoc virtualenvs.
+
+## Release Flow (GitHub CLI)
+
+When asked to "create a new release":
+
+1. Fetch tags: `git fetch --tags`.
+2. Determine the next release number by incrementing the latest tag (currently patch-based, e.g., `0.0.4` -> `0.0.5`).
+3. Create the release with generated notes: `gh release create <tag> --title "<tag>" --generate-notes`.
+4. Report the release URL.

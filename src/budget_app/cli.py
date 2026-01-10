@@ -147,9 +147,12 @@ def password_verify(password_value: str | None, hash_value: str | None) -> None:
 def sync_funds() -> None:
     """Sync monthly envelope funding."""
     from budget_app.app import create_app, sync_funding
+    from flask_migrate import upgrade
 
     app = create_app()
-    sync_funding(app)
+    with app.app_context():
+        upgrade()
+        sync_funding(app)
     console.print("Funding sync complete.")
 
 

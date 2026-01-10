@@ -9,7 +9,7 @@ Envelope Budget is a self-hosted, lightweight personal finance tool designed for
 ## ✨ Features
 
 * **Dual Funding Modes:** Choose between "Reset" (for fixed monthly bills) and "Rollover" (for accumulating savings or sinking funds).
-* **Automatic Monthly Sync:** The system detects month-over-month gaps and automatically applies funding based on your envelope settings.
+* **Automatic Funding Sync:** A cron job runs `budget-cli sync-funds` inside the container every 30 minutes to apply missed funding.
 * **Modern Interactive UI:** Built with **HTMX** and **Alpine.js** for a reactive, "Single Page App" feel without the complexity of a heavy JavaScript framework.
 * **Developer-Centric:** Secure CLI for password management and full TDD (Test-Driven Development) support.
 * **Self-Hosted Privacy:** Your data stays in your own SQLite database.
@@ -84,6 +84,8 @@ docker-compose up -d
 
 ```
 
+The container runs a cron job (see `docker/cron/root`) that calls `budget-cli sync-funds` every 30 minutes.
+
 
 
 ---
@@ -104,6 +106,7 @@ The `budget-cli` tool manages your installation's security and state.
 * **Set Password:** `uv run budget-cli password set`
 * **Verify Hash:** `uv run budget-cli password verify --password <text>`
 * **Manual Fund Sync:** `uv run budget-cli sync-funds` (Useful if you've been offline for months)
+* **Migrations:** `uv run flask --app budget_app.app db upgrade`
 
 ---
 

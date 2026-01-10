@@ -1,14 +1,16 @@
+from datetime import datetime
 from decimal import Decimal
 import os
 import re
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.pool import StaticPool
 from werkzeug.security import generate_password_hash
 
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 
-from budget_app.app import Envelope, SystemState, create_app, db, sync_funding
+from budget_app.app import Envelope, SystemState, Transaction, create_app, db, sync_funding
 
 
 @pytest.fixture()
@@ -89,6 +91,10 @@ def test_envelope_spend_decrements_balance():
     envelope.spend(Decimal("12.34"))
 
     assert envelope.balance == Decimal("37.66")
+    assert len(envelope.transactions) == 1
+    transaction = envelope.transactions[0]
+    assert transaction.amount == Decimal("12.34")
+    assert transaction.type == "spend"
 
 
 def test_envelope_spend_rejects_non_positive_amount():
@@ -117,6 +123,10 @@ def test_envelope_deposit_increments_balance():
     envelope.deposit(Decimal("8.50"))
 
     assert envelope.balance == Decimal("58.50")
+    assert len(envelope.transactions) == 1
+    transaction = envelope.transactions[0]
+    assert transaction.amount == Decimal("8.50")
+    assert transaction.type == "deposit"
 
 
 def test_envelope_deposit_rejects_non_positive_amount():
@@ -132,6 +142,61 @@ def test_envelope_deposit_rejects_non_positive_amount():
 
     with pytest.raises(ValueError):
         envelope.deposit(Decimal("-5.00"))
+
+
+def test_envelope_archive_sets_timestamp():
+    envelope = Envelope(
+        name="Dining",
+        base_amount=Decimal("50.00"),
+        balance=Decimal("50.00"),
+        mode="reset",
+    )
+
+    envelope.archive()
+
+    assert envelope.archived_at is not None
+    assert isinstance(envelope.archived_at, datetime)
+
+
+def test_envelope_archive_preserves_existing_timestamp():
+    archived_at = datetime(2024, 1, 1)
+    envelope = Envelope(
+        name="Dining",
+        base_amount=Decimal("50.00"),
+        balance=Decimal("50.00"),
+        mode="reset",
+        archived_at=archived_at,
+    )
+
+    envelope.archive()
+
+    assert envelope.archived_at == archived_at
+
+
+def test_rounded_numeric_quantizes_on_bind_and_load(client):
+    login(client)
+    with client.application.app_context():
+        envelope = Envelope(
+            name="Precise",
+            base_amount=Decimal("1.00"),
+            balance=Decimal("10.00"),
+            mode="reset",
+        )
+        db.session.add(envelope)
+        db.session.commit()
+        envelope_id = envelope.id
+        db.session.execute(
+            text(
+                "UPDATE envelope SET balance = :balance, base_amount = :base_amount WHERE id = :id"
+            ),
+            {"balance": "10.005", "base_amount": "1.005", "id": envelope_id},
+        )
+        db.session.commit()
+
+    with client.application.app_context():
+        refreshed = db.session.get(Envelope, envelope_id)
+        assert refreshed.base_amount == Decimal("1.01")
+        assert refreshed.balance == Decimal("10.01")
 
 
 def test_envelope_apply_funding_reset_sets_balance():
@@ -195,6 +260,39 @@ def test_spend_money(client):
     with client.application.app_context():
         refreshed = db.session.get(Envelope, envelope_id)
         assert refreshed.balance == Decimal("30.00")
+        transaction = (
+            Transaction.query.filter_by(envelope_id=envelope_id, type="spend").one()
+        )
+        assert transaction.amount == Decimal("20.00")
+
+
+def test_archive_envelope_sets_archived_at_and_hides_from_index(client):
+    login(client)
+    with client.application.app_context():
+        envelope = Envelope(
+            name="Dining",
+            base_amount=Decimal("50.00"),
+            balance=Decimal("50.00"),
+            mode="reset",
+        )
+        db.session.add(envelope)
+        db.session.commit()
+        envelope_id = envelope.id
+
+    response = client.post(
+        f"/envelopes/{envelope_id}/archive",
+        data={"csrf_token": get_csrf_token(client)},
+    )
+
+    assert response.status_code == 302
+    with client.application.app_context():
+        refreshed = db.session.get(Envelope, envelope_id)
+        assert refreshed.archived_at is not None
+
+    index_response = client.get("/")
+
+    assert index_response.status_code == 200
+    assert b"Dining" not in index_response.data
 
 
 def test_auto_funding_catchup(client, monkeypatch):
@@ -274,6 +372,7 @@ def test_spend_updates_ui(client):
     assert b"$30.00" in response.data
     assert b'value="30.00"' in response.data
     assert b'max="50.00"' in response.data
+    assert b'name="note"' in response.data
 
 
 def test_progress_bar_handles_rollover_surplus(client):
@@ -394,6 +493,57 @@ def test_spend_form_has_loading_indicator(client):
     assert b"Processing..." in response.data
 
 
+def test_index_shows_summary_totals(client):
+    login(client)
+    with client.application.app_context():
+        envelopes = [
+            Envelope(
+                name="Dining",
+                base_amount=Decimal("50.00"),
+                balance=Decimal("30.00"),
+                mode="reset",
+            ),
+            Envelope(
+                name="Travel",
+                base_amount=Decimal("100.00"),
+                balance=Decimal("80.00"),
+                mode="rollover",
+            ),
+        ]
+        db.session.add_all(envelopes)
+        db.session.commit()
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert b"Total Available" in response.data
+    assert b"Monthly Budgeted" in response.data
+    assert b"$110.00" in response.data
+    assert b"$150.00" in response.data
+
+
+def test_actions_buttons_disable_optimistically(client):
+    login(client)
+    with client.application.app_context():
+        envelope = Envelope(
+            name="Utilities",
+            base_amount=Decimal("90.00"),
+            balance=Decimal("90.00"),
+            mode="reset",
+        )
+        db.session.add(envelope)
+        db.session.commit()
+        envelope_id = envelope.id
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert b'x-bind:disabled="spending"' in response.data
+    assert b'x-bind:disabled="depositing"' in response.data
+    assert f'id="spend-button-{envelope_id}"'.encode() in response.data
+    assert f'id="deposit-button-{envelope_id}"'.encode() in response.data
+
+
 def test_spend_rejects_non_positive_amount(client):
     login(client)
     with client.application.app_context():
@@ -413,6 +563,135 @@ def test_spend_rejects_non_positive_amount(client):
     )
 
     assert response.status_code == 400
+    with client.application.app_context():
+        assert Transaction.query.count() == 0
+
+
+def test_spend_saves_note(client):
+    login(client)
+    with client.application.app_context():
+        envelope = Envelope(
+            name="Dining",
+            base_amount=Decimal("50.00"),
+            balance=Decimal("50.00"),
+            mode="reset",
+        )
+        db.session.add(envelope)
+        db.session.commit()
+        envelope_id = envelope.id
+
+    response = client.post(
+        f"/envelopes/{envelope_id}/spend",
+        data={
+            "amount": "12.00",
+            "note": "Dinner out",
+            "csrf_token": get_csrf_token(client),
+        },
+    )
+
+    assert response.status_code == 302
+    with client.application.app_context():
+        transaction = (
+            Transaction.query.filter_by(envelope_id=envelope_id, type="spend").one()
+        )
+        assert transaction.note == "Dinner out"
+
+
+def test_spend_returns_inline_error_for_htmx_validation(client):
+    login(client)
+    with client.application.app_context():
+        envelope = Envelope(
+            name="Dining",
+            base_amount=Decimal("50.00"),
+            balance=Decimal("50.00"),
+            mode="reset",
+        )
+        db.session.add(envelope)
+        db.session.commit()
+        envelope_id = envelope.id
+
+    response = client.post(
+        f"/envelopes/{envelope_id}/spend",
+        data={"amount": "0.00", "csrf_token": get_csrf_token(client)},
+        headers={"HX-Request": "true"},
+    )
+
+    assert response.status_code == 422
+    assert b"Amount must be positive." in response.data
+
+
+def test_deposit_returns_inline_error_for_htmx_validation(client):
+    login(client)
+    with client.application.app_context():
+        envelope = Envelope(
+            name="Dining",
+            base_amount=Decimal("50.00"),
+            balance=Decimal("50.00"),
+            mode="reset",
+        )
+        db.session.add(envelope)
+        db.session.commit()
+        envelope_id = envelope.id
+
+    response = client.post(
+        f"/envelopes/{envelope_id}/add",
+        data={"amount": "0.00", "csrf_token": get_csrf_token(client)},
+        headers={"HX-Request": "true"},
+    )
+
+    assert response.status_code == 422
+    assert b"Amount must be positive." in response.data
+
+
+def test_spend_rejects_invalid_amount(client):
+    login(client)
+    with client.application.app_context():
+        envelope = Envelope(
+            name="Dining",
+            base_amount=Decimal("50.00"),
+            balance=Decimal("50.00"),
+            mode="reset",
+        )
+        db.session.add(envelope)
+        db.session.commit()
+        envelope_id = envelope.id
+
+    response = client.post(
+        f"/envelopes/{envelope_id}/spend",
+        data={"amount": "nope", "csrf_token": get_csrf_token(client)},
+    )
+
+    assert response.status_code == 400
+    with client.application.app_context():
+        assert Transaction.query.count() == 0
+
+
+def test_deposit_creates_transaction(client):
+    login(client)
+    with client.application.app_context():
+        envelope = Envelope(
+            name="Dining",
+            base_amount=Decimal("50.00"),
+            balance=Decimal("50.00"),
+            mode="reset",
+        )
+        db.session.add(envelope)
+        db.session.commit()
+        envelope_id = envelope.id
+
+    response = client.post(
+        f"/envelopes/{envelope_id}/add",
+        data={"amount": "15.00", "csrf_token": get_csrf_token(client)},
+    )
+
+    assert response.status_code == 302
+    with client.application.app_context():
+        refreshed = db.session.get(Envelope, envelope_id)
+        assert refreshed.balance == Decimal("65.00")
+        transaction = (
+            Transaction.query.filter_by(envelope_id=envelope_id, type="deposit").one()
+        )
+        assert transaction.amount == Decimal("15.00")
 
 
 def test_deposit_rejects_non_positive_amount(client):
@@ -434,6 +713,8 @@ def test_deposit_rejects_non_positive_amount(client):
     )
 
     assert response.status_code == 400
+    with client.application.app_context():
+        assert Transaction.query.count() == 0
 
 
 def test_csrf_extension_initialized(client):
@@ -443,3 +724,49 @@ def test_csrf_extension_initialized(client):
 def test_post_without_csrf_token_is_rejected(client):
     response = client.post("/login", data={"password": "secret"})
     assert response.status_code in {400, 403}
+
+
+def test_create_app_does_not_sync_funding(monkeypatch):
+    calls = []
+
+    def fake_sync(app):
+        calls.append(app)
+
+    monkeypatch.setattr("budget_app.app.sync_funding", fake_sync)
+    app = create_app(
+        {
+            "TESTING": True,
+            "SECRET_KEY": "test-secret",
+            "SQLALCHEMY_DATABASE_URI": "sqlite://",
+            "SQLALCHEMY_ENGINE_OPTIONS": {
+                "connect_args": {"check_same_thread": False},
+                "poolclass": StaticPool,
+            },
+        }
+    )
+
+    assert app is not None
+    assert calls == []
+
+
+def test_create_app_does_not_create_tables(monkeypatch):
+    calls = []
+
+    def fake_create_all():
+        calls.append(True)
+
+    monkeypatch.setattr("budget_app.app.db.create_all", fake_create_all)
+    app = create_app(
+        {
+            "TESTING": True,
+            "SECRET_KEY": "test-secret",
+            "SQLALCHEMY_DATABASE_URI": "sqlite://",
+            "SQLALCHEMY_ENGINE_OPTIONS": {
+                "connect_args": {"check_same_thread": False},
+                "poolclass": StaticPool,
+            },
+        }
+    )
+
+    assert app is not None
+    assert calls == []
