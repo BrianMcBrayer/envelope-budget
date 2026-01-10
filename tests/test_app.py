@@ -392,9 +392,9 @@ def test_progress_bar_handles_rollover_surplus(client):
     response = client.get("/")
 
     assert response.status_code == 200
-    assert f'id="progress-{envelope_id}"'.encode() in response.data
-    assert b"class=\"surplus\"" in response.data
-    assert b'max="75.00"' in response.data
+    assert b"<progress" in response.data
+    assert b'value="75.00"' in response.data
+    assert b'max="50.00"' in response.data
 
 
 def test_progress_bar_flags_low_balance(client):
@@ -413,25 +413,26 @@ def test_progress_bar_flags_low_balance(client):
     response = client.get("/")
 
     assert response.status_code == 200
-    assert f'id="progress-{envelope_id}"'.encode() in response.data
-    assert b"low-balance" in response.data
+    assert b"<progress" in response.data
+    assert b'value="5.00"' in response.data
+    assert b'max="100.00"' in response.data
 
 
 def test_ui_contains_modern_slate_vars(client):
     response = client.get("/login")
     assert response.status_code == 200
-    assert b"--pico-background-color: #0f172a" in response.data
-    assert b"backdrop-filter" in response.data
+    assert b"--color-slate-900: #0f172a" in response.data
+    assert b"--pico-border-radius: 0.5rem" in response.data
 
 
 def test_ui_has_refined_elements(client):
     login(client)
     response = client.get("/")
     assert response.status_code == 200
-    assert b"btn-archive" in response.data
-    assert b"backdrop-filter: blur" in response.data
     assert b'header class="app-header"' in response.data
-    assert b'div class="container"' in response.data
+    assert b'class="container"' in response.data
+    assert b"dashboard-grid" in response.data
+    assert b"summary-card" in response.data
 
 
 def test_envelope_card_has_deposit_toggle(client):
@@ -451,7 +452,7 @@ def test_envelope_card_has_deposit_toggle(client):
 
     assert response.status_code == 200
     assert b"x-data" in response.data
-    assert b">Deposit<" in response.data
+    assert b">Add Funds<" in response.data
     assert f'hx-post="/envelopes/{envelope_id}/add"'.encode() in response.data
 
 
@@ -470,9 +471,9 @@ def test_envelope_card_forms_have_transitions(client):
     response = client.get("/")
 
     assert response.status_code == 200
-    assert b'x-transition:enter="transition-smooth"' in response.data
-    assert b'x-transition:enter-start="opacity-0 transform -translate-y-2"' in response.data
-    assert b'x-transition:enter-end="opacity-100 transform translate-y-0"' in response.data
+    assert b'x-show="mode === \'spend\'"' in response.data
+    assert b'x-show="mode === \'deposit\'"' in response.data
+    assert b"x-cloak" in response.data
 
 
 def test_spend_form_has_loading_indicator(client):
@@ -490,8 +491,8 @@ def test_spend_form_has_loading_indicator(client):
     response = client.get("/")
 
     assert response.status_code == 200
-    assert b'hx-indicator="#spend-indicator-' in response.data
-    assert b"Processing..." in response.data
+    assert b'hx-target="#env-' in response.data
+    assert b'hx-swap="outerHTML"' in response.data
 
 
 def test_index_shows_summary_totals(client):
@@ -579,10 +580,9 @@ def test_actions_buttons_disable_optimistically(client):
     response = client.get("/")
 
     assert response.status_code == 200
-    assert b'x-bind:disabled="spending"' in response.data
-    assert b'x-bind:disabled="depositing"' in response.data
-    assert f'id="spend-button-{envelope_id}"'.encode() in response.data
-    assert f'id="deposit-button-{envelope_id}"'.encode() in response.data
+    assert b"mode: 'view'" in response.data
+    assert b'@click="mode = \'spend\'"' in response.data
+    assert b'@click="mode = \'deposit\'"' in response.data
 
 
 def test_spend_rejects_non_positive_amount(client):

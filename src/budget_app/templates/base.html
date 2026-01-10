@@ -7,207 +7,101 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pico.min.css') }}" />
     <style>
       :root {
-        --primary-h: 171;
-        --primary-s: 100%;
-        --primary-l: 35%;
-        --pico-primary: hsl(var(--primary-h), var(--primary-s), var(--primary-l));
-        --pico-primary-hover: hsl(var(--primary-h), var(--primary-s), 25%);
-        --pico-font-family: "Inter", "Space Grotesk", sans-serif;
-        --pico-border-radius: 1rem;
-        --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        --pico-font-size: 100%;
+        --pico-border-radius: 0.5rem;
+        --color-slate-900: #0f172a;
+        --color-emerald-600: #059669;
+        --color-rose-600: #e11d48;
       }
 
-      @media (prefers-color-scheme: light) {
-        :root {
-          --pico-background-color: #f8fafc;
-          --pico-card-background-color: #ffffff;
-          --pico-border-color: #e2e8f0;
-          --color-danger: #e11d48;
-          --color-success: #10b981;
-          --header-bg: rgba(248, 250, 252, 0.9);
-          --header-border-color: transparent;
-        }
-      }
-
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --pico-background-color: #0f172a;
-          --pico-card-background-color: #1e293b;
-          --pico-border-color: #334155;
-          --pico-color: #f1f5f9;
-          --color-danger: #fb7185;
-          --color-success: #34d399;
-          --header-bg: rgba(15, 23, 42, 0.85);
-          --header-border-color: rgba(226, 232, 240, 0.08);
-        }
-      }
-
+      /* Reset & Base */
       body {
-        background-color: var(--pico-background-color);
+        background-color: #f8fafc;
+        color: var(--color-slate-900);
       }
 
-      header.app-header {
-        margin-bottom: 2rem;
-        position: sticky;
-        top: 0;
-        z-index: 10;
-        backdrop-filter: blur(10px);
-        background-color: var(--header-bg);
-        padding: 1rem 0;
-        border-bottom: 1px solid var(--header-border-color);
+      /* Dashboard Layout */
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin-top: 2rem;
       }
 
-      h1,
-      h2,
-      h3,
-      h4,
-      h5,
-      h6 {
-        letter-spacing: -0.025em;
+      /* Summary Card (Full Width) */
+      .summary-card {
+        grid-column: 1 / -1;
+        background: var(--color-slate-900);
+        color: white;
+        border: none;
       }
 
-      .card,
+      .summary-card h2 {
+        color: white;
+        font-size: 2.5rem;
+      }
+
+      .summary-card small {
+        color: #cbd5e1; /* slate-300 */
+      }
+
+      /* Envelope Cards */
       .envelope-card {
-        background: var(--pico-card-background-color);
-        border: 1px solid var(--pico-border-color);
-        border-radius: var(--pico-border-radius);
+        background: white;
+        border: 1px solid #e2e8f0;
         padding: 1.5rem;
-      }
-
-      .envelope-card {
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-          0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        transition: var(--transition-smooth);
+        border-radius: var(--pico-border-radius);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
         display: flex;
         flex-direction: column;
-        gap: 1rem;
+        justify-content: space-between;
       }
 
       .envelope-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
-          0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        border-color: var(--pico-primary);
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
       }
 
       .card-header {
         display: flex;
         justify-content: space-between;
-        align-items: center;
-        gap: 1rem;
+        align-items: flex-start;
+        margin-bottom: 1rem;
       }
 
-      .balance-display h2 {
+      .card-header h3 {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 600;
+      }
+
+      .balance-large {
         font-size: 2rem;
-        margin-bottom: 0.5rem;
+        font-weight: 700;
+        margin: 0.5rem 0;
+        color: var(--color-slate-900);
       }
 
-      progress {
-        height: 8px !important;
-        background-color: var(--pico-border-color);
+      /* Alpine JS Transitions */
+      .fade-enter-active,
+      .fade-leave-active {
+        transition: opacity 0.2s ease, transform 0.2s ease;
       }
 
-      progress::-webkit-progress-bar {
-        background-color: var(--pico-border-color);
-        border-radius: 999px;
+      .fade-enter-start,
+      .fade-leave-end {
+        opacity: 0;
+        transform: translateY(-5px);
       }
 
-      progress::-webkit-progress-value {
-        background-color: var(--pico-progress-color, var(--pico-primary));
-        border-radius: 999px;
-        transition: width 0.5s ease-in-out;
+      /* Utilities */
+      .text-danger {
+        color: var(--color-rose-600);
       }
 
-      progress::-moz-progress-bar {
-        background-color: var(--pico-progress-color, var(--pico-primary));
-        border-radius: 999px;
-      }
-
-      .surplus {
-        --pico-progress-color: var(--color-success) !important;
-      }
-
-      .low-balance {
-        --pico-progress-color: var(--color-danger) !important;
-      }
-
-      .negative {
-        color: var(--color-danger) !important;
-      }
-
-      .transition-smooth {
-        transition: var(--transition-smooth);
-      }
-
-      input:focus,
-      select:focus,
-      textarea:focus {
-        border-color: var(--pico-primary) !important;
-        box-shadow: 0 0 0 3px rgba(31, 122, 91, 0.1) !important;
-      }
-
-      .btn-archive {
-        opacity: 0.3;
-        border: none !important;
-        background: transparent !important;
-        transition: var(--transition-smooth);
-      }
-
-      .envelope-card:hover .btn-archive {
-        opacity: 1;
-      }
-
-      .spend-form button {
-        font-weight: 600;
-        letter-spacing: 0.01em;
-      }
-
-      .loading-indicator {
-        color: #4c6b5f;
-        display: inline-flex;
-        font-size: 0.9rem;
-        gap: 0.5rem;
-        align-items: center;
-      }
-
-      .loading-indicator::before {
-        animation: spin 1s linear infinite;
-        border: 2px solid rgba(76, 107, 95, 0.2);
-        border-top-color: #4c6b5f;
-        border-radius: 999px;
-        content: "";
-        height: 0.85rem;
-        width: 0.85rem;
-      }
-
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
-
-      .empty-state {
-        text-align: center;
-      }
-
-      .manage-panel {
-        margin-top: 2rem;
-      }
-
-      .manage-panel summary {
-        cursor: pointer;
-        font-weight: 600;
-      }
-
-      .actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.75rem;
-        align-items: center;
-      }
-
-      .amount-input {
-        max-width: 120px;
+      .text-success {
+        color: var(--color-emerald-600);
       }
 
       [x-cloak] {

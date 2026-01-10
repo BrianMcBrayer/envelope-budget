@@ -1,145 +1,80 @@
-<article
-  class="envelope-card"
-  id="env-{{ env.id }}"
-  x-data="{ showDeposit: false, spending: false, depositing: false }"
->
-  <header class="card-header" style="border-bottom: none; padding: 0; margin-bottom: 0.5rem;">
-    <strong style="font-size: 1.1rem; letter-spacing: -0.01em;">{{ env.name }}</strong>
-    <form action="{{ url_for('archive_envelope', envelope_id=env.id) }}" method="post" style="margin: 0;">
+<article class="envelope-card" id="env-{{ env.id }}" x-data="{ mode: 'view' }">
+  <div class="card-header">
+    <h3>{{ env.name }}</h3>
+    <form action="{{ url_for('archive_envelope', envelope_id=env.id) }}" method="post">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-      <button type="submit" class="btn-archive" aria-label="Archive">
-        <small>Archive</small>
+      <button type="submit" class="outline secondary" style="padding: 0.2rem 0.5rem; font-size: 0.7rem;">
+        Archive
       </button>
     </form>
-  </header>
+  </div>
 
-  <div class="balance-display">
-    {% set is_surplus = env.balance > env.base_amount %}
-    {% set is_low_balance = env.base_amount and env.balance < (env.base_amount / 10) %}
-    <h2
-      id="balance-val-{{ env.id }}"
-      class="{% if env.balance < 0 %}negative{% endif %}"
-    >
+  <div class="balance-section">
+    <div class="balance-large {% if env.balance < 0 %}text-danger{% endif %}">
       {{ env.balance|currency }}
-    </h2>
+    </div>
+
     <progress
-      id="progress-{{ env.id }}"
-      class="{% if is_surplus %}surplus{% endif %}{% if is_low_balance %}{% if is_surplus %} {% endif %}low-balance{% endif %}"
       value="{{ env.balance if env.balance > 0 else 0 }}"
-      max="{{ env.balance if is_surplus else env.base_amount }}"
-      style="--pico-progress-color: var(--pico-primary);"
+      max="{{ env.base_amount }}"
+      style="margin-bottom: 1rem;"
     ></progress>
+
+    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #64748b;">
+      <span>Target: {{ env.base_amount|currency }}</span>
+      <span style="text-transform: capitalize;">{{ env.mode }}</span>
+    </div>
   </div>
 
   {% if error %}
-    <p
-      class="error-message"
-      role="alert"
-      style="margin: 0.5rem 0 0; color: var(--pico-del-color); font-weight: 600;"
-    >
-      {{ error }}
-    </p>
+    <div style="background: #fee2e2; color: #991b1b; padding: 0.5rem; border-radius: 4px; margin: 0.5rem 0;">
+      <small>{{ error }}</small>
+    </div>
   {% endif %}
 
-  <div class="actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
-    <button
-      type="button"
-      class="outline"
-      @click="showDeposit = false"
-      :class="!showDeposit && 'primary'"
-      :aria-pressed="showDeposit === false"
-    >
-      Spend
-    </button>
-    <button
-      type="button"
-      class="outline"
-      @click="showDeposit = true"
-      :class="showDeposit && 'primary'"
-      :aria-pressed="showDeposit === true"
-    >
-      Deposit
-    </button>
+  <hr style="margin: 1rem 0;">
+
+  <div class="grid" x-show="mode === 'view'">
+    <button @click="mode = 'spend'" class="outline contrast">Spend</button>
+    <button @click="mode = 'deposit'" class="outline">Add Funds</button>
   </div>
 
   <form
+    x-show="mode === 'spend'"
     hx-post="{{ url_for('spend', envelope_id=env.id) }}"
     hx-target="#env-{{ env.id }}"
     hx-swap="outerHTML"
-    hx-indicator="#spend-indicator-{{ env.id }}"
-    action="{{ url_for('spend', envelope_id=env.id) }}"
-    method="post"
-    class="spend-form"
-    x-show="showDeposit === false"
-    x-transition:enter="transition-smooth"
-    x-transition:enter-start="opacity-0 transform -translate-y-2"
-    x-transition:enter-end="opacity-100 transform translate-y-0"
+    style="margin-bottom: 0;"
     x-cloak
   >
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-    <fieldset role="group">
-      <input
-        type="number"
-        name="amount"
-        step="0.01"
-        min="0"
-        placeholder="Amount spent..."
-        required
-      />
-      <button
-        type="submit"
-        id="spend-button-{{ env.id }}"
-        x-bind:disabled="spending"
-        @click="spending = true"
-      >
-        Spend
-      </button>
-    </fieldset>
-    <input
-      type="text"
-      name="note"
-      placeholder="Note (optional)..."
-      maxlength="255"
-    />
-    <small
-      id="spend-indicator-{{ env.id }}"
-      class="htmx-indicator loading-indicator"
-      role="status"
-      aria-live="polite"
-    >
-      Processing...
-    </small>
+    <label>
+        <small>Amount to spend</small>
+        <input type="number" name="amount" step="0.01" min="0" required autofocus />
+    </label>
+    <input type="text" name="note" placeholder="Note (optional)" />
+    <div class="grid">
+        <button type="submit" class="contrast">Confirm</button>
+        <button type="button" class="outline secondary" @click="mode = 'view'">Cancel</button>
+    </div>
   </form>
 
   <form
+    x-show="mode === 'deposit'"
     hx-post="{{ url_for('add_funds', envelope_id=env.id) }}"
     hx-target="#env-{{ env.id }}"
     hx-swap="outerHTML"
-    action="{{ url_for('add_funds', envelope_id=env.id) }}"
-    method="post"
-    class="deposit-form"
-    x-show="showDeposit === true"
-    x-transition:enter="transition-smooth"
-    x-transition:enter-start="opacity-0 transform -translate-y-2"
-    x-transition:enter-end="opacity-100 transform translate-y-0"
+    style="margin-bottom: 0;"
     x-cloak
   >
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-    <fieldset role="group">
-      <input
-        type="number"
-        name="amount"
-        step="0.01"
-        min="0"
-        placeholder="Amount deposited..."
-        required
-      />
-      <button
-        type="submit"
-        id="deposit-button-{{ env.id }}"
-        x-bind:disabled="depositing"
-        @click="depositing = true"
-      >Deposit</button>
-    </fieldset>
+    <label>
+        <small>Amount to deposit</small>
+        <input type="number" name="amount" step="0.01" min="0" required autofocus />
+    </label>
+    <div class="grid">
+        <button type="submit">Confirm</button>
+        <button type="button" class="outline secondary" @click="mode = 'view'">Cancel</button>
+    </div>
   </form>
 </article>
